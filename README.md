@@ -1,32 +1,67 @@
-# RK3588 YOLO Profile
+# RK3588 YOLO 性能评测与板端推理
 
-RK3588 上的 YOLO/RKNN 性能评测、DMA-BUF/RGA 零拷贝执行、后处理优化和摄像头运动算法验证代码与结果摘要。
+本仓库汇总 YOLOv5、YOLOv5u、YOLOv8、YOLO11、YOLO26 在 RK3588 上的 INT8 推理研究，包含 DMA-BUF/RGA/RKNN C++ 推理代码、连板测量工具、运动算法测试及经过筛选的性能/精度报告。
 
-本仓库发布可复现的源码、脚本和经过筛选的板端报告，不包含模型权重、COCO 图片、NV12 帧、逐图检测结果或本机 build 目录。复测需要用户自行准备 RK3588、匹配版本的 RKNN Runtime/Toolkit、RGA/MPP/OpenCV 运行库及 COCO 数据。
+> **结果口径先看这里：**下表的板端 FPS 是“预加载 NV12 DMA-BUF 回放 → RGA 预处理 → RKNN NPU → 输出同步 → CPU 后处理”的实测吞吐，不是摄像头采集 FPS，也不是单独的 NPU FPS。NPU-only FPS 是由实测 NPU 阶段均值取倒数得到的估算值。三 context 结果是三个独立任务各绑定一个 NPU 核同时处理不同帧，不代表一帧被三个核拆分。
 
-## 已整理的内容
+## RK3588 性能总览
 
-- `src/rkvs/`：C++ DMA-BUF 摄像头/帧流、RGA 预处理、RKNN 多 context 检测服务、后处理与跟踪组件。
-- `tools/`：RK3588 性能/质量测试、COCO 评估、运动算法资源统计与汇总脚本。
-- `reports/`：YOLOv5/v5u/v8/11/26 性能摘要、MOG2/帧差在 640、2K、4K 的板端报告，以及 YOLO26 后处理 A/B 结果。
-- `config/`：硬件链路示例配置；请按本机摄像头节点、RKNN 模型路径和网络环境修改。
+分辨率 640×640、batch 1、RKNN INT8。单 context 固定 Core 0；三 context 分别绑定 Core 0/1/2。
 
-## 测试口径摘要
+| 模型 | NPU 推理均值 (ms) | NPU-only 估算 (FPS)¹ | 连板回放 E2E，1 context (FPS) | 连板回放并发吞吐，3 contexts (FPS) | 后处理 (ms) |
+|---|---:|---:|---:|---:|---:|
+| YOLOv5n | 16.58 | 60.31 | 47.58 | 137.49 | 2.49 |
+| YOLOv5s | 26.07 | 38.36 | 31.52 | 94.03 | 2.76 |
+| YOLOv5nu | 20.90 | 47.85 | 39.95 | 122.70 | 0.96 |
+| YOLOv5su | 32.61 | 30.67 | 26.44 | 79.96 | 1.61 |
+| YOLOv8n | 15.210 | 65.75 | 56.90 | 156.84 | 0.261 |
+| YOLOv8s | 28.796 | 34.73 | 32.09 | 87.80 | 0.257 |
+| YOLO11n | 18.659 | 53.59 | 47.27 | 130.45 | 0.266 |
+| YOLO11s | 33.124 | 30.19 | 28.14 | 75.10 | 0.211 |
+| YOLO26n/s | — | — | — | — | 3.064 / 3.320² |
 
-- YOLO 基准：RK3588、RKNN INT8、640×640、batch 1。单核指单 context 绑定 NPU Core 0；三核吞吐为三个独立 context 分别绑定 Core 0/1/2，并行处理不同帧，不是单帧跨核拆分。
-- DMA 回放 FPS 包括 NV12→RGB/resize/letterbox、NPU、输出同步和 CPU 后处理；不是裸 NPU FPS，也不代表相机采集上限。
-- YOLOv8/YOLO11 的 COCO1000 FP32→INT8 AP50-95 变化约为 -0.0246 至 -0.0292。YOLOv5u 的 FP32 基线检测与 YOLOv5 检测完全重复，故不发布其精度差值。
-- YOLO26 后处理 A/B 只发布相同输入、预测逐条完全一致的耗时对比，不在这里发布历史 YOLO26 精度数值。此前精度异常的模型导出/量化结果不作为有效数据。
-- 摄像头运动测试表明：优化三帧差可在 640×640 与原生 2K NV12 接近/达到 60 FPS；4K 全分辨率帧差和 MOG2 均达不到 60 FPS。
+¹ `1000 / NPU 推理均值(ms)`，仅表示模型执行阶段的倒数，不含 RGA、同步、后处理、排队或应用开销；不是端到端 FPS。 ² YOLO26n/s 是优化前后处理路径的均值，不是整网延迟或 FPS。当前这份可公开的有效结果没有 YOLO26 完整模型吞吐，因此不与其他版本排速度名次。
 
-## 关键结果
+- **连板回放 E2E**：基准程序运行在 RK3588 上。计时覆盖 DMA-BUF 输入回放、RGA 色彩转换/resize/letterbox、RKNN 推理、输出同步、解码/筛选/NMS（或模型相应的检测过滤）到检测结果。模型和 DMA 输入预先加载；ADB 部署、文件传输不在逐帧计时中。它不是 V4L2 摄像头实时链路的采集到显示 FPS。
+- **1 context** 是单帧串行延迟/吞吐口径；**3 contexts** 是并行不同帧的设备总吞吐。两者用途不同，不能用三 context FPS 代表单帧时延。
+- YOLOv5/v5u 数据来自已有三轮回放汇总；YOLOv8/11 结果来自三轮独立 Profile。v8/v11 的完整分项和资源记录见 [v8/v11 报告](reports/v8-v11/REPORT.md)。跨批次 FPS 作为方向性比较；严谨复测请用仓库 benchmark 在同一轮次、同一输入下重跑。
+- 当前发布结果不含相机 V4L2 → 检测 → 显示/编码完整链路 FPS。运动算法报告中的 camera FPS 是相机/运动处理吞吐，不应当误读为 YOLO 检测 FPS。
 
-详见 [`reports/YOLO-performance-summary.md`](reports/YOLO-performance-summary.md)、[`reports/v8-v11/REPORT.md`](reports/v8-v11/REPORT.md)、[`reports/yolo26-postprocess/REPORT.md`](reports/yolo26-postprocess/REPORT.md) 以及三个 `reports/motion-*` 报告。
+## COCO 精度对比
 
-## 构建与运行
+AP50-95 使用一组固定、互不重复的 1000 张 COCO val2017 图片评估；RKNN INT8 量化校准使用独立的 500 张 COCO train 图片。表中数值为 AP（0–1），`Δ` = RKNN INT8 − PyTorch FP32。数据代表本次固定子集，不等同于完整 COCO val2017 官方指标。
 
-项目通过 CMake 构建。目标板需要匹配的 RKNN Runtime、RGA、DMA heap 与相机驱动；交叉编译时通过工具链文件配置 AArch64 编译器。Rockchip SDK 中带有专有标识的 RKNN API headers/runtime libraries 未随仓库发布，请通过 `RKNN_API_PATH` 与 `RKNN_RT_LIB` 指向你本机获授权的 SDK 文件；RGA/MPP 头文件可按 Apache-2.0 条款使用，运行库应从匹配版本 SDK 提供。CMake 参数也支持用 `RGA_PATH`、`RGA_LIB`、`MPP_PATH`、`MPP_LIB` 指定本机依赖。
+| 模型 | PyTorch FP32 AP50-95 | RKNN INT8 AP50-95 | Δ | 结论/质量状态 |
+|---|---:|---:|---:|---|
+| YOLOv5n | 0.34551 | 0.25212 | -0.09339 | 量化损失较大，部署前应重新校准并复测 |
+| YOLOv5s | 0.42114 | 0.33900 | -0.08214 | 量化损失较大，部署前应重新校准并复测 |
+| YOLOv5nu | — | — | — | PT 基线预测曾与 YOLOv5 对应尺寸逐框完全相同；精度比较判为无效，不发布数值 |
+| YOLOv5su | — | — | — | PT 基线预测曾与 YOLOv5 对应尺寸逐框完全相同；精度比较判为无效，不发布数值 |
+| YOLOv8n | 0.36766 | 0.34308 | -0.02458 | 本次有效比较中量化损失较小 |
+| YOLOv8s | 0.44461 | 0.41650 | -0.02811 | 本次有效比较中量化损失较小 |
+| YOLO11n | 0.39437 | 0.36517 | -0.02920 | 本次有效比较中量化损失较小 |
+| YOLO11s | 0.46473 | 0.43766 | -0.02707 | 本次有效比较中量化损失较小 |
+| YOLO26n/s | — | — | — | 历史导出/量化精度异常；不发布错误精度，不据此做精度或综合排名 |
 
-COCO 精度/校准实验须使用独立的校准集与测试集，清单与权重哈希应保存在本机实验目录；不要把数据集、权重或逐图结果提交到 Git。
+YOLO26 发布内容限于相同输入上检测结果逐条一致的**后处理 A/B 耗时**，不声称该结果是官方 one-to-one/NMS-free 推理。当前优化报告使用的是 raw-head one-to-many 路径并执行 NMS。详见 [YOLO26 后处理报告](reports/yolo26-postprocess/REPORT.md)。
 
-更多 pipeline 参数见 [`tools/rk3588_int8_pipeline.py`](tools/rk3588_int8_pipeline.py) 和 [`reports/v8-v11/REPORT.md`](reports/v8-v11/REPORT.md)。
+## 板端推理文件与复现
+
+主要连板推理与评估代码已纳入仓库，可从以下文件进入：
+
+- [`tools/rk3588_yolo_benchmark.cc`](tools/rk3588_yolo_benchmark.cc)：板端 C++ DMA-BUF/NV12 回放基准；输出 copy、queue、RGA、NPU、输出同步、后处理和 E2E 逐帧时间。支持 CPU-copy 对照及单 context/三 context 模式。
+- [`tools/rk3588_yolo_quality.cc`](tools/rk3588_yolo_quality.cc)：固定图片列表逐张上板推理，输出 COCO 检测 JSONL 与分阶段 timing。
+- [`tools/rk3588_int8_pipeline.py`](tools/rk3588_int8_pipeline.py)：ADB 预检、校准/测试集清单、模型转换、部署运行、原始数据回收和统计汇总的编排脚本。
+- [`tools/evaluate_coco_jsonl.py`](tools/evaluate_coco_jsonl.py)、[`tools/evaluate_coco_pair_jsonl.py`](tools/evaluate_coco_pair_jsonl.py)：检测结果 COCO AP 计算与成对比较。
+- `src/rkvs/rknn_detector.cc`、`src/rkvs/detector_adapter.cc` 及 `include/rkvs/`：DMA-BUF 导入、RGA 预处理、RKNN context/核绑定、输出解码和各模型后处理适配。
+
+详细依赖、构建、ADB 运行示例和口径说明见 [RK3588 连板推理指南](docs/board-inference.md)。注意：当前通用 C++ adapter 覆盖 YOLOv5 anchor-based、YOLOv8、YOLO11 和 YOLO26；YOLOv5u 虽有历史 FPS 摘要，但尚无与此通用 runner 对应的独立 adapter/有效精度基线，不要把它的摘要数字当成这份 runner 已复现的结果。
+
+## 其他实验
+
+- [640×640 运动算法](reports/motion-640/REPORT.md)、[2K](reports/motion-2k/REPORT.md)、[4K](reports/motion-4k/REPORT.md)：帧差/MOG2 的分辨率、帧率和资源数据。它们测的是运动处理而非 YOLO FPS。
+- [YOLO 完整摘要](reports/YOLO-performance-summary.md)：早期结果及数据边界。
+
+## 构建依赖与数据
+
+复现需自行准备 RK3588、与系统匹配的 RKNN Runtime、授权的 RKNN API headers、RGA/MPP/OpenCV 运行依赖、模型文件和数据集。仓库不包含权重、`.rknn`、数据集、NV12 帧或逐图预测；Rockchip 带专有标识的 RKNN headers/runtime 不随仓库发布。SDK 路径通过 `RKNN_API_PATH`、`RKNN_RT_LIB`、`RGA_PATH`、`RGA_LIB`、`MPP_PATH`、`MPP_LIB` 配置。校准图片与评估图片应保持不重合，模型结果不要只看帧率，需同时看业务集召回率和精度。
