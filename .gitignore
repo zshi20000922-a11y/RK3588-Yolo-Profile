@@ -22,6 +22,9 @@
 *.pth
 *.weights
 
+# Only the reviewed, board-validated RKNN release artifacts are tracked.
+!models/rk3588-int8/*.rknn
+
 # Local machine and IDE files
 .vscode/
 .idea/
