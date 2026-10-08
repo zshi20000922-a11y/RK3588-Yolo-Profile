@@ -1,0 +1,83 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "rkvs-minimal",
+      "displayName": "rk_vision_service minimal V4L2 + RKNN",
+      "binaryDir": "${sourceDir}/build-rkvs-minimal",
+      "cacheVariables": {
+        "BUILD_LEGACY_DEMO": "OFF",
+        "BUILD_DUAL_DETECTOR": "OFF",
+        "RKVS_BUILD_SERVICE": "ON",
+        "RKVS_WITH_V4L2": "ON",
+        "RKVS_WITH_RTSP_INPUT": "OFF",
+        "RKVS_WITH_DISPLAY": "OFF",
+        "RKVS_WITH_MPP_ENCODE": "OFF",
+        "RKVS_WITH_UDP_OUTPUT": "OFF",
+        "RKVS_WITH_RTSP_OUTPUT": "OFF",
+        "RKVS_WITH_BYTETRACK": "OFF",
+        "RKVS_WITH_FRAME_DIFF": "OFF"
+      }
+    },
+    {
+      "name": "rkvs-detection",
+      "displayName": "rk_vision_service V4L2 + YOLO + tracking + motion",
+      "binaryDir": "${sourceDir}/build-rkvs-detection",
+      "cacheVariables": {
+        "BUILD_LEGACY_DEMO": "OFF",
+        "BUILD_DUAL_DETECTOR": "OFF",
+        "RKVS_BUILD_SERVICE": "ON",
+        "RKVS_WITH_V4L2": "ON",
+        "RKVS_WITH_RTSP_INPUT": "OFF",
+        "RKVS_WITH_DISPLAY": "OFF",
+        "RKVS_WITH_MPP_ENCODE": "OFF",
+        "RKVS_WITH_UDP_OUTPUT": "OFF",
+        "RKVS_WITH_RTSP_OUTPUT": "OFF",
+        "RKVS_WITH_BYTETRACK": "ON",
+        "RKVS_WITH_FRAME_DIFF": "ON"
+      }
+    },
+    {
+      "name": "rkvs-network",
+      "displayName": "rk_vision_service network input/output",
+      "binaryDir": "${sourceDir}/build-rkvs-network",
+      "cacheVariables": {
+        "BUILD_LEGACY_DEMO": "OFF",
+        "BUILD_DUAL_DETECTOR": "OFF",
+        "RKVS_BUILD_SERVICE": "ON",
+        "RKVS_WITH_V4L2": "ON",
+        "RKVS_WITH_RTSP_INPUT": "ON",
+        "RKVS_WITH_DISPLAY": "OFF",
+        "RKVS_WITH_MPP_ENCODE": "ON",
+        "RKVS_WITH_UDP_OUTPUT": "ON",
+        "RKVS_WITH_RTSP_OUTPUT": "ON",
+        "RKVS_WITH_BYTETRACK": "ON",
+        "RKVS_WITH_FRAME_DIFF": "ON"
+      }
+    },
+    {
+      "name": "rkvs-full",
+      "displayName": "rk_vision_service full board build",
+      "binaryDir": "${sourceDir}/build-rkvs-full",
+      "cacheVariables": {
+        "BUILD_LEGACY_DEMO": "OFF",
+        "BUILD_DUAL_DETECTOR": "OFF",
+        "RKVS_BUILD_SERVICE": "ON",
+        "RKVS_WITH_V4L2": "ON",
+        "RKVS_WITH_RTSP_INPUT": "ON",
+        "RKVS_WITH_DISPLAY": "ON",
+        "RKVS_WITH_MPP_ENCODE": "ON",
+        "RKVS_WITH_UDP_OUTPUT": "ON",
+        "RKVS_WITH_RTSP_OUTPUT": "ON",
+        "RKVS_WITH_BYTETRACK": "ON",
+        "RKVS_WITH_FRAME_DIFF": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "rkvs-minimal", "configurePreset": "rkvs-minimal" },
+    { "name": "rkvs-detection", "configurePreset": "rkvs-detection" },
+    { "name": "rkvs-network", "configurePreset": "rkvs-network" },
+    { "name": "rkvs-full", "configurePreset": "rkvs-full" }
+  ]
+}

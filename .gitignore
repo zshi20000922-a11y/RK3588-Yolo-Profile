@@ -1,0 +1,31 @@
+# Local builds and generated executables
+/build*/
+/install/
+*.o
+*.a
+*.so
+*.so.*
+*.rknn
+*.engine
+*.onnx
+*.onnx.data
+
+# Datasets, frames, recordings, and per-image predictions
+**/datasets/
+**/frames/
+*.nv12
+*.mp4
+*.jsonl
+
+# Model checkpoints and generated detections
+*.pt
+*.pth
+*.weights
+
+# Local machine and IDE files
+.vscode/
+.idea/
+*.user
+*.log
+__pycache__/
+.DS_Store

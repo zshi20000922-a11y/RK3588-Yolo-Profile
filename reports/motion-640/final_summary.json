@@ -1,0 +1,60 @@
+[
+  {
+    "algorithm": "fd_opt60_final",
+    "seconds": 30,
+    "motion_frames": 1814,
+    "motion_fps": 60.46666666666667,
+    "camera_fps": 60.46666666666667,
+    "coverage_pct": 100.0,
+    "rga": {
+      "avg": 6.07555,
+      "p50": 6.05704,
+      "p95": 6.18004
+    },
+    "algorithm_stage": {
+      "avg": 6.95881,
+      "p50": 6.73692,
+      "p95": 10.519
+    },
+    "combined_mean_ms": 13.03436,
+    "cpu_mean_pct": 201.48715713262658,
+    "cpu_p95_pct": 215.69620253164558,
+    "rss_mb": 48.453125,
+    "temp_max_c": 37.923,
+    "npu_mean": [
+      0.36666666666666664,
+      0.3,
+      0.3333333333333333
+    ],
+    "errors": 0
+  },
+  {
+    "algorithm": "mog2_60_final",
+    "seconds": 30,
+    "motion_frames": 1810,
+    "motion_fps": 60.333333333333336,
+    "camera_fps": 60.4,
+    "coverage_pct": 99.8896247240618,
+    "rga": {
+      "avg": 5.92498,
+      "p50": 5.91879,
+      "p95": 5.98763
+    },
+    "algorithm_stage": {
+      "avg": 9.56492,
+      "p50": 9.27179,
+      "p95": 11.5566
+    },
+    "combined_mean_ms": 15.4899,
+    "cpu_mean_pct": 299.4412689165675,
+    "cpu_p95_pct": 313.0,
+    "rss_mb": 67.15625,
+    "temp_max_c": 40.692,
+    "npu_mean": [
+      0.7,
+      0.7,
+      0.8333333333333334
+    ],
+    "errors": 0
+  }
+]
