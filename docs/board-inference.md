@@ -9,13 +9,28 @@
 | [`tools/rk3588_yolo_benchmark.cc`](../tools/rk3588_yolo_benchmark.cc) | 板端连续帧性能测试，写出逐帧 CSV 和总吞吐；支持 DMA-BUF 回放/CPU-copy 基线、单 context/三 context。 |
 | [`tools/rk3588_yolo_quality.cc`](../tools/rk3588_yolo_quality.cc) | 按固定 NV12 清单逐图推理，生成 COCO JSONL 预测与各阶段 timing。 |
 | [`tools/rk3588_int8_pipeline.py`](../tools/rk3588_int8_pipeline.py) | ADB 预检、数据清单、量化转换、上板运行、采回原始数据和汇总。脚本当前转换矩阵是 YOLOv8/11/26 n/s；不要据此声称它自动完成 YOLOv5/v5u 转换。 |
+| [`tools/convert_yolo26_rk3588.py`](../tools/convert_yolo26_rk3588.py) | 单独转换 YOLO26n/s：RKOptimized raw-head ONNX → RK3588 asymmetric INT8 RKNN，校验九输出 schema 并保存哈希 manifest。 |
 | [`tools/prepare_coco_nv12.py`](../tools/prepare_coco_nv12.py) | 将固定图片清单转成板端 NV12 输入并生成输入列表。 |
 | [`tools/evaluate_coco_jsonl.py`](../tools/evaluate_coco_jsonl.py)、[`tools/evaluate_coco_pair_jsonl.py`](../tools/evaluate_coco_pair_jsonl.py) | 从逐图 JSONL 计算 COCO AP，或在完全相同测试图片上成对比较 FP32 与 INT8。 |
 | [`src/rkvs/rknn_detector.cc`](../src/rkvs/rknn_detector.cc)、[`src/rkvs/detector_adapter.cc`](../src/rkvs/detector_adapter.cc) | RKNN context、NPU 核绑定、RGA 预处理、输出同步和 YOLO 解码/NMS。 |
 
 仓库有 C++ YOLOv5 anchor-based、YOLOv8、YOLO11、YOLO26 adapter。YOLOv5u 的历史 FPS 被保留在性能摘要中，但当前通用 adapter 没有独立的 YOLOv5u 输出协议；其精度基线也因预测重复而判为无效，因此不能声称已由这里的 runner 独立复现。
 
-YOLO26 adapter 根据实际输出 tensor schema 区分 `[N,6]` 一对一输出和 raw-head 输出。但当前 `rk3588_int8_pipeline.py convert` 只接受 6/9 个 raw-head 输出；它不是经过本仓库完整验证的官方 one-to-one 导出/量化流程。README 的 YOLO26 后处理数据来自 raw-head one-to-many 路径，执行传统 NMS，不能标为 NMS-free。
+本仓库公开并评测的 YOLO26 是九输出 raw-head one-to-many 图，CPU 执行 score-sum 过滤、解码和分类 NMS；不是官方 one-to-one `[1,300,6]` NMS-free 模型。专用转换脚本只接受该已验证的九输出协议，遇到不同输出 schema 会失败退出，避免误把不同导出路径的精度/性能混在一起。通用 `rk3588_int8_pipeline.py convert` 仍适用于 v8/11/26 raw-head 模型，但生成的 manifest 也将明确记为 raw-head + NMS。
+
+### YOLO26n/s 导出与 INT8 转换
+
+转换需要模型权重、固定 500 张 COCO train 校准图片清单、RKNN Toolkit 2 和项目测试时使用的 RKOptimized Ultralytics checkout。转换器并不下载权重或图片。校准清单每行是一张图片路径；脚本要求恰好 500 个唯一且存在的文件。`--ultralytics-repo` 指向含对应 RKNN exporter 的源码 checkout，普通上游 Ultralytics 不保证支持 `format='rknn'`。
+
+```bash
+python3 tools/convert_yolo26_rk3588.py \
+  --weights /path/to/yolo26n.pt \
+  --ultralytics-repo /path/to/rkoptimized-ultralytics \
+  --calibration /path/to/calibration_500.txt \
+  --output artifacts/yolo26n
+```
+
+输出包含固定 640×640、batch 1 的 `_rkopt.onnx`、RK3588 INT8 `.rknn`、转换日志及带权重/ONNX/RKNN/校准列表 SHA-256 和 output schema 的 `conversion_manifest.json`。导出参数为 `dynamic=False, opset=14`。性能/精度表只对应九输出 raw-head 路径；不要用该转换结果声称实现了官方 NMS-free one-to-one 语义。
 
 ## 构建基准程序
 
@@ -71,5 +86,5 @@ adb -s 10.153.18.29:5555 shell 'cd /data/local/tmp/rk_yolo_bench && chmod +x rk3
 
 - 可用的 YOLOv8/11 完整分阶段数据和三轮轮间稳定性见 [`reports/v8-v11/REPORT.md`](../reports/v8-v11/REPORT.md)。
 - YOLOv5/v5u 历史吞吐与 v5 FP32/INT8 精度见 [`reports/YOLO-performance-summary.md`](../reports/YOLO-performance-summary.md)；v5u 的精度值不发布，v5u 对应 runner 适配仍缺失。
-- YOLO26 只发布通过逐条检测一致性检查的后处理优化 A/B；由于没有可用于同口径比较的有效 AP 和整网吞吐数据，不给出 YOLO26 的精度或 FPS 排名。
+- YOLO26 的有效 COCO 子集精度与 RK3588 连板 DMA 回放吞吐见 [`reports/yolo26/REPORT.md`](../reports/yolo26/REPORT.md)。它明确区分 NPU inference-only、单 context E2E FPS 和 3-context 总吞吐；该固定回放只有一次 1000 帧工程测量，不等同三轮长测，也不是 V4L2 相机 FPS。
 - 表中 `640×640` 是模型输入尺寸。性能基准的输入为已预加载内存图像；运动算法测试包含真实 V4L2 摄像头，但不代表 YOLO 检测链路。

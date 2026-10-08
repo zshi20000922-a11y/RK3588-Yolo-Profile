@@ -159,7 +159,10 @@ def cmd_convert(a):
             f"family: {family}\ntask: detect\ninput:\n  width: 640\n  height: 640\n  format: rgb\n  layout: nhwc\n"
             f"quantization: int8\nlabels: {labels}\npostprocess:\n  confidence: {a.confidence}\n"
             f"  nms_iou: {a.iou}\n  max_detections: 100\n  class_agnostic_nms: false\n", encoding="utf-8")
-        records.append({"model": name, "family": family, "nms_free": family == "yolo26",
+        records.append({"model": name, "family": family,
+                        "output_semantics": "raw_head_one_to_many",
+                        "nms_free": False,
+                        "postprocess": "raw-head decode + confidence filter + NMS",
                         "weight": str(weight), "weight_sha256": sha256(weight),
                         "onnx": str(onnx_path), "onnx_sha256": sha256(onnx_path), "onnx_schema": schema,
                         "rknn": str(rknn_path), "rknn_sha256": sha256(rknn_path),
@@ -238,7 +241,8 @@ def cmd_run(a):
                     (run_dir / "stdout.log").write_text(result.stdout)
                     (run_dir / "run.json").write_text(json.dumps({"model": name, "family": family,
                         "mode": mode, "input_mode": input_mode, "round": round_index,
-                        "nms_free": family == "yolo26", "serial": a.serial,
+                        "output_semantics": "raw_head_one_to_many",
+                        "nms_free": False, "serial": a.serial,
                         "measured_frames": int(match.group(1)) if match else None,
                         "wall_seconds": float(match.group(2)) if match else None,
                         "measured_fps": float(match.group(3)) if match else None}, indent=2))

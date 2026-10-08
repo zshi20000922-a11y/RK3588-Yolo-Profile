@@ -18,9 +18,10 @@
 | YOLOv8s | 28.796 | 34.73 | 32.09 | 87.80 | 0.257 |
 | YOLO11n | 18.659 | 53.59 | 47.27 | 130.45 | 0.266 |
 | YOLO11s | 33.124 | 30.19 | 28.14 | 75.10 | 0.211 |
-| YOLO26n/s | — | — | — | — | 3.064 / 3.320² |
+| YOLO26n | 24.33 / 26.78 | 41.1 / 37.3 | 27.70 | 83.46 | 7.89 / 5.95 |
+| YOLO26s | 44.25 / 47.66 | 22.6 / 21.0 | 17.57 | 50.66 | 8.62 / 7.97 |
 
-¹ `1000 / NPU 推理均值(ms)`，仅表示模型执行阶段的倒数，不含 RGA、同步、后处理、排队或应用开销；不是端到端 FPS。 ² YOLO26n/s 是优化前后处理路径的均值，不是整网延迟或 FPS。当前这份可公开的有效结果没有 YOLO26 完整模型吞吐，因此不与其他版本排速度名次。
+¹ `1000 / NPU 推理均值(ms)`，仅表示模型执行阶段的倒数，不含 RGA、同步、后处理、排队或应用开销；不是端到端 FPS。YOLO26 的 E2E 性能是优化后的 RKNN raw-head one-to-many 模型在 RK3588 上的固定 NV12 DMA 回放结果；它是单次 1000 帧工程测试，不具备 v8/v11 三轮长测的重复性等级。其后处理仍包括 CPU NMS。逐帧数据与质量结果见 [YOLO26 完整报告](reports/yolo26/REPORT.md)。
 
 - **连板回放 E2E**：基准程序运行在 RK3588 上。计时覆盖 DMA-BUF 输入回放、RGA 色彩转换/resize/letterbox、RKNN 推理、输出同步、解码/筛选/NMS（或模型相应的检测过滤）到检测结果。模型和 DMA 输入预先加载；ADB 部署、文件传输不在逐帧计时中。它不是 V4L2 摄像头实时链路的采集到显示 FPS。
 - **1 context** 是单帧串行延迟/吞吐口径；**3 contexts** 是并行不同帧的设备总吞吐。两者用途不同，不能用三 context FPS 代表单帧时延。
@@ -41,17 +42,19 @@ AP50-95 使用一组固定、互不重复的 1000 张 COCO val2017 图片评估�
 | YOLOv8s | 0.44461 | 0.41650 | -0.02811 | 本次有效比较中量化损失较小 |
 | YOLO11n | 0.39437 | 0.36517 | -0.02920 | 本次有效比较中量化损失较小 |
 | YOLO11s | 0.46473 | 0.43766 | -0.02707 | 本次有效比较中量化损失较小 |
-| YOLO26n/s | — | — | — | 历史导出/量化精度异常；不发布错误精度，不据此做精度或综合排名 |
+| YOLO26n | 0.41273 | 0.36373 | -0.04900 | RKNN INT8 raw-head score-sum 结果；存在明显量化损失 |
+| YOLO26s | 0.48989 | 0.43238 | -0.05751 | RKNN INT8 raw-head score-sum 结果；存在明显量化损失 |
 
-YOLO26 发布内容限于相同输入上检测结果逐条一致的**后处理 A/B 耗时**，不声称该结果是官方 one-to-one/NMS-free 推理。当前优化报告使用的是 raw-head one-to-many 路径并执行 NMS。详见 [YOLO26 后处理报告](reports/yolo26-postprocess/REPORT.md)。
+YOLO26 的发布结果来自修正后的 raw-head one-to-many 路径，仍执行传统 NMS；并非官方 one-to-one/NMS-free 端到端模型。此前无效输出协议和 no-NMS 实验的精度数据不纳入本仓库公开精度表。FP32/RKNN INT8 精度、固定回放 FPS、后处理优化与测试边界见 [YOLO26 完整报告](reports/yolo26/REPORT.md) 和 [后处理 A/B 报告](reports/yolo26-postprocess/REPORT.md)。
 
 ## 板端推理文件与复现
 
-主要连板推理与评估代码已纳入仓库，可从以下文件进入：
+主要连板推理、评估和 YOLO26 转换代码已纳入仓库，可从以下文件进入：
 
 - [`tools/rk3588_yolo_benchmark.cc`](tools/rk3588_yolo_benchmark.cc)：板端 C++ DMA-BUF/NV12 回放基准；输出 copy、queue、RGA、NPU、输出同步、后处理和 E2E 逐帧时间。支持 CPU-copy 对照及单 context/三 context 模式。
 - [`tools/rk3588_yolo_quality.cc`](tools/rk3588_yolo_quality.cc)：固定图片列表逐张上板推理，输出 COCO 检测 JSONL 与分阶段 timing。
 - [`tools/rk3588_int8_pipeline.py`](tools/rk3588_int8_pipeline.py)：ADB 预检、校准/测试集清单、模型转换、部署运行、原始数据回收和统计汇总的编排脚本。
+- [`tools/convert_yolo26_rk3588.py`](tools/convert_yolo26_rk3588.py)：从项目所用 RKOptimized Ultralytics 分支导出九输出 raw-head ONNX，并构建 RK3588 INT8 RKNN；导出 manifest 会明确标记 one-to-many/NMS 语义。
 - [`tools/evaluate_coco_jsonl.py`](tools/evaluate_coco_jsonl.py)、[`tools/evaluate_coco_pair_jsonl.py`](tools/evaluate_coco_pair_jsonl.py)：检测结果 COCO AP 计算与成对比较。
 - `src/rkvs/rknn_detector.cc`、`src/rkvs/detector_adapter.cc` 及 `include/rkvs/`：DMA-BUF 导入、RGA 预处理、RKNN context/核绑定、输出解码和各模型后处理适配。
 
