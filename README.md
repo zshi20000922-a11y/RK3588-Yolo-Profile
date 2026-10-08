@@ -23,6 +23,8 @@
 
 ¹ `1000 / NPU 推理均值(ms)`，仅表示模型执行阶段的倒数，不含 RGA、同步、后处理、排队或应用开销；不是端到端 FPS。YOLO26 的 E2E 性能是优化后的 RKNN raw-head one-to-many 模型在 RK3588 上的固定 NV12 DMA 回放结果；它是单次 1000 帧工程测试，不具备 v8/v11 三轮长测的重复性等级。其后处理仍包括 CPU NMS。逐帧数据与质量结果见 [YOLO26 完整报告](reports/yolo26/REPORT.md)。
 
+YOLO26 后处理另在相同 1000 张 COCO NV12 图片、conf=0.25 下做了 A/B：最新 NEON + 量化域早筛版均值为 n=3.064 ms、s=3.320 ms，新旧逐图检测完全一致。这是单独的后处理阶段结果；尚未用该 NEON 版本重跑完整 E2E 吞吐，不能直接替换上表中的固定回放分项。实现及 one-to-one 导出失败原因见 [YOLO26 后处理报告](reports/yolo26-postprocess/REPORT.md)。
+
 - **连板回放 E2E**：基准程序运行在 RK3588 上。计时覆盖 DMA-BUF 输入回放、RGA 色彩转换/resize/letterbox、RKNN 推理、输出同步、解码/筛选/NMS（或模型相应的检测过滤）到检测结果。模型和 DMA 输入预先加载；ADB 部署、文件传输不在逐帧计时中。它不是 V4L2 摄像头实时链路的采集到显示 FPS。
 - **1 context** 是单帧串行延迟/吞吐口径；**3 contexts** 是并行不同帧的设备总吞吐。两者用途不同，不能用三 context FPS 代表单帧时延。
 - YOLOv5/v5u 数据来自已有三轮回放汇总；YOLOv8/11 结果来自三轮独立 Profile。v8/v11 的完整分项和资源记录见 [v8/v11 报告](reports/v8-v11/REPORT.md)。跨批次 FPS 作为方向性比较；严谨复测请用仓库 benchmark 在同一轮次、同一输入下重跑。
