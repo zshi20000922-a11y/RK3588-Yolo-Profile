@@ -8,6 +8,8 @@ All board FPS below were measured on RK3588 with a preloaded 1920×1080 NV12 DMA
 
 ## Board performance
 
+The following replay table is a historical full-pipeline measurement using the earlier postprocessing implementation. Its postprocess column is retained only to document how that particular E2E run was composed; it is **not** the current optimized postprocess latency. The current one-context A/B is reported separately below. The new NEON implementation has not yet been rerun as a full E2E or three-context benchmark.
+
 | Model | Mode | NPU inference (ms) | Postprocess (ms) | E2E (ms) | E2E FPS |
 |---|---|---:|---:|---:|---:|
 | YOLO26n | 1 context, Core 0 | 24.33 | 7.89 | 36.02 | 27.70 |
@@ -17,9 +19,13 @@ All board FPS below were measured on RK3588 with a preloaded 1920×1080 NV12 DMA
 
 The NPU-only rate can be estimated as `1000 / inference_ms`: n ≈41.1/37.3 FPS and s ≈22.6/21.0 FPS for one/three-context measurements. These are **inference-stage reciprocal estimates**, not end-to-end rates. E2E ms is per-frame latency; three-context FPS is aggregate throughput across the three concurrent workers, so these two columns are not mathematical inverses. Three contexts process three different frames concurrently; one frame is not split across three NPU cores.
 
-The E2E replay values are the postprocess-optimized fixed-frame results: one 1000-frame measurement per model/mode. They are useful engineering measurements but are not the same repeatability tier as the three-round, ≥60-second v8/v11 runs. Per-frame measurements are preserved in [`raw/`](raw/). A separate optimization report records the postprocessing A/B method and exact detection equivalence at confidence 0.25 in [`reports/yolo26-postprocess`](../yolo26-postprocess/REPORT.md).
+The E2E replay values are the fixed-frame results from the earlier postprocessing-optimized binary: one 1000-frame measurement per model/mode. They are useful engineering measurements but are not the same repeatability tier as the three-round, ≥60-second v8/v11 runs. Per-frame measurements are preserved in [`raw/`](raw/). A separate optimization report records the current postprocessing A/B method and exact detection equivalence at confidence 0.25 in [`reports/yolo26-postprocess`](../yolo26-postprocess/REPORT.md).
 
-Postprocessing is candidate-dependent. On the fixed replay, it contributes about 6–9 ms after optimization. On a separate 1000-image natural COCO input, postprocess means were about 17.4 ms (n) and 27.0 ms (s) before the later NEON implementation; do not splice those natural-image timings into the fixed-replay FPS table. The latest NEON A/B on RK3588 reduced single-context postprocess from 8.216 to 3.064 ms (n) and 8.671 to 3.320 ms (s), while per-image detections were byte-identical. That A/B is a postprocessing-only measurement; a new full E2E throughput run with the NEON binary has not been reported here. The implementation and explanation of both rejected one-to-one export paths are in the [postprocessing/export report](../yolo26-postprocess/REPORT.md).
+### Latest postprocessing-only A/B
+
+On a separate fixed 1000-image COCO NV12 set (single context, conf=0.25), the current NEON + quantized-domain early-reject implementation measured **3.064 ms mean for YOLO26n** and **3.320 ms for YOLO26s**. Per-image detection outputs were byte-identical to the scalar baseline. Three-context timings and a full-pipeline E2E rerun with this implementation are not yet available. Do not substitute these postprocess-only means for E2E latency or FPS. Full percentiles, method, and raw CSVs are in the [postprocessing/export report](../yolo26-postprocess/REPORT.md).
+
+Postprocessing is candidate-dependent. On a separate 1000-image natural COCO input, earlier means were about 17.4 ms (n) and 27.0 ms (s); do not splice those timings into the fixed-replay FPS table. The implementation and explanation of both rejected one-to-one export paths are in the [postprocessing/export report](../yolo26-postprocess/REPORT.md).
 
 ## COCO subset accuracy
 
