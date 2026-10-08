@@ -62,6 +62,6 @@
 ## 产物
 
 - `aggregate_summary.json`：三轮完整统计、所有分位数、CPU、NPU 负载、温度和频率。
-- `*_layer_perf.txt`：RKNN 板端逐层明细。
+- `*_layer_perf.txt`：RKNN 板端逐层明细；已发布副本与全模型索引见[逐层 Profile 报告](../layer-profiles/README.md)。
 - `*_r*.csv`：逐帧耗时；`*_monitor.csv`：约 500 ms 周期资源监控。
 - 精度原始汇总位于相邻目录 `../quality_1000/`。

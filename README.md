@@ -9,6 +9,7 @@ RK3588 上的 YOLO 推理、后处理与视频预处理基准项目。仓库包�
 - [结果摘要](#结果摘要)
 - [精度对比](#精度对比)
 - [YOLO26 后处理与导出结论](#yolo26-后处理与导出结论)
+- [RKNN 逐层 Profile](#rknn-逐层-profile)
 - [复现与工具](#复现与工具)
 - [模型文件](#模型文件)
 - [仓库结构](#仓库结构)
@@ -36,6 +37,12 @@ RK3588 上的 YOLO 推理、后处理与视频预处理基准项目。仓库包�
 - 这些是预加载输入回放，不是 V4L2 相机到检测结果的实测 FPS。摄像头/运动算法 FPS 见 [640p](reports/motion-640/REPORT.md)、[2K](reports/motion-2k/REPORT.md)、[4K](reports/motion-4k/REPORT.md)。
 
 详细分项、稳定性、后处理口径和每轮数据见 [v8/v11 报告](reports/v8-v11/REPORT.md)、[YOLO26 报告](reports/yolo26/REPORT.md) 与 [完整家族摘要](reports/YOLO-performance-summary.md)。
+
+各模型 RKNN 单 context/Core 0 的逐算子性能明细（包括每层耗时、WorkLoad、shape 和读写量）见 [RKNN 逐层 Profile 报告](reports/layer-profiles/README.md)。
+
+## RKNN 逐层 Profile
+
+已将 YOLOv5/v5u/v8/v11/v26 的 n/s 共 10 份逐算子原始日志加入仓库：[逐层报告与汇总](reports/layer-profiles/README.md)。它们是启用 RKNN perf-detail 的独立插桩结果，不等同于主表的无插桩推理 FPS。
 
 ## 精度对比
 
