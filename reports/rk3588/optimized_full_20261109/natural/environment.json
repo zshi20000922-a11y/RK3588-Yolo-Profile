@@ -1,0 +1,41 @@
+{
+  "timestamp_utc": "2026-11-08T18:36:07.560547+00:00",
+  "serial": "redacted",
+  "confidence": 0.25,
+  "warmup": 20,
+  "input_list_local_sha256": "a235f35c13690790b97803dd3edb785319bc46427e386a4dea921e4ee37c1aba",
+  "input_list_board_sha256": "3121cac4907745ec3ac19565429a7424481b186d2cf97fa924fc90dd3001fada",
+  "device": "Linux ATK-DLRK3588 6.1.141 #9 SMP Sun Sep 20 13:32:42 CST 2026 aarch64 GNU/Linux\nNPU load:  Core0:  0%, Core1:  0%, Core2:  0%,\n1.98 3.02 2.79 2/296 22308\n",
+  "model_paths": {
+    "yolov5n": [
+      "/data/local/tmp/yolov5_additions/yolov5n_rk3588_int8.rknn",
+      "/data/local/tmp/yolov5_additions/yolov5n.yaml",
+      "yolov5"
+    ],
+    "yolov5s": [
+      "/data/local/tmp/yolov5_additions/yolov5s_rk3588_int8.rknn",
+      "/data/local/tmp/yolov5_additions/yolov5s.yaml",
+      "yolov5"
+    ],
+    "yolov5nu": [
+      "/data/local/tmp/yolov5_additions/yolov5nu_rk3588_int8.rknn",
+      "/data/local/tmp/yolov5_additions/yolov5nu.yaml",
+      "yolov8"
+    ],
+    "yolov5su": [
+      "/data/local/tmp/yolov5_additions/yolov5su_rk3588_int8.rknn",
+      "/data/local/tmp/yolov5_additions/yolov5su.yaml",
+      "yolov8"
+    ],
+    "yolo26n": [
+      "/data/local/tmp/rk_yolo_bench/yolo26n.rknn",
+      "/data/local/tmp/rk_yolo_bench/yolo26n.yaml",
+      "yolo26"
+    ],
+    "yolo26s": [
+      "/data/local/tmp/rk_yolo_bench/yolo26s.rknn",
+      "/data/local/tmp/rk_yolo_bench/yolo26s.yaml",
+      "yolo26"
+    ]
+  }
+}

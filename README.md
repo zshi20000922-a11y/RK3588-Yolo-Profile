@@ -17,26 +17,24 @@ RK3588 上的 YOLO 推理、后处理与视频预处理基准项目。仓库包�
 
 ## 结果摘要
 
-测试统一为 RK3588、RKNN INT8、模型输入 640×640、batch=1。单 context 固定 Core 0；三 context 是分别绑定 Core 0/1/2、同时处理不同帧的**整机吞吐**，不是一帧拆给三个 NPU 核。
+当前总览以 [PT / TensorRT / RKNN 综合报告](reports/YOLO-backend-comparison-PT-TRT-RKNN.md) 和 [优化后板端完整复测](reports/rk3588/optimized_full_20261109/REPORT.md) 为准。下表为 COCO val1000 固定图像清单上的 RKNN INT8 自然图单 context Profile：预载 NV12 → RGA → NPU → 输出同步 → CPU 后处理；不含相机采集、JPEG 解码、显示或存盘。FPS 是 `1000 / E2E mean` 的样本均值折算，不是相机长时帧率。
 
-| 模型 | NPU 推理均值 ms（单/三 context） | NPU-only 倒数估算 FPS（单/三 context） | 板端 E2E 回放 FPS（单/三 context） | 后处理 ms（单 context 最新优化 / 三 context） |
-|---|---:|---:|---:|---:|
-| YOLOv5n | 16.58 / 16.82 | 60.31 / 59.45 | 47.58 / 137.49 | 2.49 / 2.55 |
-| YOLOv5s | 26.07 / 26.65 | 38.36 / 37.52 | 31.52 / 94.03 | 2.76 / 2.52 |
-| YOLOv5nu | 20.90 / 20.61 | 47.85 / 48.52 | 39.95 / 122.70 | 0.96 / 0.90 |
-| YOLOv5su | 32.61 / 33.27 | 30.67 / 30.06 | 26.44 / 79.96 | 1.61 / 1.26 |
-| YOLOv8n | 15.21 / 16.56 | 65.75 / 60.39 | 56.90 / 156.84 | 0.26 / 0.34 |
-| YOLOv8s | 28.80 / 31.56 | 34.73 / 31.69 | 32.09 / 87.80 | 0.26 / 0.36 |
-| YOLO11n | 18.66 / 20.43 | 53.59 / 48.95 | 47.27 / 130.45 | 0.27 / 0.30 |
-| YOLO11s | 33.12 / 37.33 | 30.19 / 26.79 | 28.14 / 75.10 | 0.21 / 0.28 |
-| YOLO26n | 24.33 / 26.78 | 41.11 / 37.34 | 27.70 / 83.46 | **3.064 / 未复测** |
-| YOLO26s | 44.25 / 47.66 | 22.60 / 20.98 | 17.57 / 50.66 | **3.320 / 未复测** |
+| 模型 | NPU 均值 ms | CPU 后处理 mean / P95 ms | E2E mean / P95 ms | 折算 FPS | 三 context NV12 回放总吞吐 FPS |
+|---|---:|---:|---:|---:|---:|
+| YOLOv5n | 15.620 | 1.111 / 2.151 | 18.024 / 21.966 | 55.48 | 145.30 |
+| YOLOv5s | 25.071 | 1.751 / 2.805 | 28.636 / 30.876 | 34.92 | 98.77 |
+| YOLOv5nu | 19.047 | 1.069 / 2.500 | 22.062 / 25.975 | 45.33 | 125.37 |
+| YOLOv5su | 31.977 | 1.691 / 3.466 | 36.127 / 39.258 | 27.68 | 79.64 |
+| YOLOv8n | 15.160 | 0.460 / 1.040 | 16.370 / 18.150 | 61.08 | 156.84 |
+| YOLOv8s | 28.620 | 0.380 / 1.030 | 29.650 / 32.440 | 33.72 | 87.80 |
+| YOLO11n | 18.680 | 0.500 / 1.190 | 20.070 / 22.140 | 49.82 | 130.45 |
+| YOLO11s | 33.830 | 0.710 / 1.570 | 35.560 / 38.050 | 28.12 | 75.10 |
+| YOLO26n score-sum | 24.369 | 2.380 / 2.727 | 29.305 / 33.201 | 34.12 | 92.81 |
+| YOLO26s score-sum | 42.274 | 0.638 / 0.722 | 45.657 / 50.398 | 21.90 | 57.62 |
 
-- `NPU-only FPS` 是 `1000 / rknn_run 均值(ms)`，仅用于表示模型执行阶段速度；不含 RGA、同步和 CPU 后处理，**不是整机帧率**。
-- YOLO26 的 E2E 回放 FPS 仍是较早版本的固定 NV12 输入、每配置单次 1000 帧结果；**最新 NEON 后处理尚未重新跑完整 E2E**。表内后处理列已更新为最新单 context A/B 均值；三 context 优化后数值尚未测量，故不沿用旧版数字。详见 [YOLO26 报告](reports/yolo26/REPORT.md)。
-- 这些是预加载输入回放，不是 V4L2 相机到检测结果的实测 FPS。摄像头/运动算法 FPS 见 [640p](reports/motion-640/REPORT.md)、[2K](reports/motion-2k/REPORT.md)、[4K](reports/motion-4k/REPORT.md)。
+三 context 列是三个 context 分别绑定 NPU Core 0/1/2、并行处理不同帧的总吞吐，不是单帧三核协同延迟。该列来自固定 NV12 回放三轮长测，和上面的自然图逐帧 Profile 不是同一测试边界。TensorRT 数据来自桌面 RTX 5090，不是 RK3588 性能。相机/运动算法结果见 [640p](reports/motion-640/REPORT.md)、[2K](reports/motion-2k/REPORT.md)、[4K](reports/motion-4k/REPORT.md)。
 
-详细分项、稳定性、后处理口径和每轮数据见 [v8/v11 报告](reports/v8-v11/REPORT.md)、[YOLO26 报告](reports/yolo26/REPORT.md) 与 [完整家族摘要](reports/YOLO-performance-summary.md)。
+详细分项、稳定性、处理定义和原始结果见 [PT / TensorRT / RKNN 综合报告](reports/YOLO-backend-comparison-PT-TRT-RKNN.md)、[优化后板端完整复测](reports/rk3588/optimized_full_20261109/REPORT.md)、[同测试集 RKNN 报告](reports/rk3588/unified_same_dataset_rknn/REPORT.md) 和 [TensorRT RTX 5090 原始报告](reports/tensorrt-5090-2026-11-05/REPORT.md)。
 
 各模型 RKNN 单 context/Core 0 的逐算子性能明细（包括每层耗时、WorkLoad、shape 和读写量）见 [RKNN 逐层 Profile 报告](reports/layer-profiles/README.md)。
 
@@ -50,22 +48,22 @@ AP50-95 使用同一组 1000 张 COCO val 图片评估；INT8 校准采用另外
 
 | 模型 | PyTorch FP32 AP50-95 | RKNN INT8 AP50-95 | 变化 | 说明 |
 |---|---:|---:|---:|---|
-| YOLOv5n | 0.34551 | 0.25212 | -0.09339 | 量化损失较大 |
-| YOLOv5s | 0.42114 | 0.33900 | -0.08214 | 量化损失较大 |
-| YOLOv5nu | — | 0.32097 | — | PT 基线复核前不报告量化损失 |
-| YOLOv5su | — | 0.39334 | — | PT 基线复核前不报告量化损失 |
-| YOLOv8n | 0.36766 | 0.34308 | -0.02458 | 本组子集比较 |
-| YOLOv8s | 0.44461 | 0.41650 | -0.02811 | 本组子集比较 |
-| YOLO11n | 0.39437 | 0.36517 | -0.02920 | 本组子集比较 |
-| YOLO11s | 0.46473 | 0.43766 | -0.02707 | 本组子集比较 |
-| YOLO26n | 0.41273 | 0.36373 | -0.04900 | raw-head score-sum 导出 |
-| YOLO26s | 0.48989 | 0.43238 | -0.05751 | raw-head score-sum 导出 |
+| YOLOv5n | 0.28800* | 0.25212 | -0.03588* | YOLOv5 validator，日志精度为 0.001 |
+| YOLOv5s | 0.37800* | 0.33900 | -0.03900* | YOLOv5 validator，日志精度为 0.001 |
+| YOLOv5nu | 0.34407 | 0.32097 | -0.02310† | PT/RKNN 基线协议疑点，差值谨慎解读 |
+| YOLOv5su | 0.42152 | 0.39334 | -0.02818† | PT/RKNN 基线协议疑点，差值谨慎解读 |
+| YOLOv8n | 0.36997 | 0.34308 | -0.02689 | 同一验证图清单 |
+| YOLOv8s | 0.44897 | 0.41650 | -0.03247 | 同一验证图清单 |
+| YOLO11n | 0.39580 | 0.36517 | -0.03063 | 同一验证图清单 |
+| YOLO11s | 0.46706 | 0.43766 | -0.02940 | 同一验证图清单 |
+| YOLO26n | 0.40683 | 0.36250 | -0.04433 | 正式九输出 raw-head score-sum |
+| YOLO26s | 0.48459 | 0.43819 | -0.04640 | 正式九输出 raw-head score-sum |
 
-YOLOv5u 的历史 PT 预测与对应 YOLOv5 结果曾逐框完全相同，因此不将其 PT 基线作为有效比较。最终部署前应使用目标场景数据复测小目标召回率、误检和漏检。
+评估参数为 `imgsz=640, conf=0.001, IoU=0.45, max_det=100`。十个模型使用相同 COCO val2017 1000 张清单，但不同模型族的 validator 实现并非完全相同；完整限制见综合报告。`*` YOLOv5 legacy validator 仅报告三位小数；`†` v5u 曾有 PT/RKNN 对应基线异常，差值仅供参考。AP 变化用 0–1 表示，部署前应使用业务数据复核小目标召回率。
 
 ## YOLO26 后处理与导出结论
 
-当前最优后处理实现在 [`src/rkvs/detector_adapter.cc`](src/rkvs/detector_adapter.cc)：INT8/UINT8 score-sum 量化域早筛、AArch64 NEON 类别 argmax、候选向量预留和 NMS 框面积缓存。在 RK3588、1000 张相同 COCO NV12 输入、置信度 0.25 的后处理 A/B 中，YOLO26n/s 分别为 **3.064 / 3.320 ms**；新旧逐图检测输出完全一致。该值只代表后处理，不应和完整 E2E 帧率互换。
+正式板端模型为九输出 raw-head score-sum one-to-many，CPU 仍负责解码和 NMS。最新正式模型 COCO val1000 Profile 的后处理均值为 YOLO26n/s **2.380 / 0.638 ms**（conf=0.25）；分位数、精度及三轮吞吐见[优化后完整复测报告](reports/rk3588/optimized_full_20261109/REPORT.md)。独立校准集导出的 score-max 实验不替代正式结果；旧 NEON A/B 数字也不与当前正式模型数据混用。one-to-one 导出问题见 [YOLO26 后处理/导出报告](reports/yolo26-postprocess/REPORT.md)。
 
 已验证、用于性能和精度表的 YOLO26 RKNN 是**九输出 raw-head one-to-many**，CPU 仍执行 NMS；不是官方 one-to-one/NMS-free 模型。one-to-one 尝试的两个问题如下：
 
@@ -103,6 +101,10 @@ cmake --build build-rkvs-minimal --target rk3588_yolo_benchmark rk3588_yolo_qual
 - [`tools/rk3588_int8_pipeline.py`](tools/rk3588_int8_pipeline.py)：环境预检、固定数据清单、转换编排、上板运行和汇总。
 - [`tools/convert_yolo26_rk3588.py`](tools/convert_yolo26_rk3588.py)：YOLO26 raw-head RKOptimized ONNX → RK3588 asymmetric INT8 RKNN。
 - [`tools/evaluate_coco_pair_jsonl.py`](tools/evaluate_coco_pair_jsonl.py)：相同 image IDs 的 FP32 / INT8 成对 AP 评估。
+- [`tools/run_optimized_rk3588_matrix.py`](tools/run_optimized_rk3588_matrix.py)、[`tools/run_optimized_natural_profile.py`](tools/run_optimized_natural_profile.py)、[`tools/run_optimized_coco_map.py`](tools/run_optimized_coco_map.py)：2026-11-09 优化后 RK3588 测试矩阵、自然图分项和 COCOeval 预测采集脚本。
+- [`tools/tensorrt_pc_benchmark.py`](tools/tensorrt_pc_benchmark.py) 与 [`tools/validate_common_accuracy.py`](tools/validate_common_accuracy.py)：上位机 TensorRT 性能及 PT/TRT 同清单精度复核。
+
+完整重跑需准备外部 COCO 数据、交叉编译产物和原始实验工作区；这些大体积数据不随仓库发布。可通过 `RK3588_ROOT`、`RK3588_YOLO_WORKSPACE`、`COCO_DATASET_ROOT`、`YOLOV5_LEGACY_ROOT` 指定本机路径；ADB 设备可用 `ANDROID_SERIAL` 选择。报告附有输入清单/内容哈希和模型哈希用于复核。
 
 ## 模型文件
 

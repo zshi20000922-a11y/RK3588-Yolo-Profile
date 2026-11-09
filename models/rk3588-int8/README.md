@@ -19,6 +19,6 @@ For accuracy, latency, and FPS associated with each artifact, see [the results o
 
 ## Scope and provenance
 
-These are the board-validated INT8 deployment artifacts for the listed benchmark paths—not the original `.pt` checkpoints or ONNX intermediates. The rejected YOLO26 one-to-one and one-to-many/no-NMS test artifacts are intentionally excluded. Checksum verification establishes file identity; it does not replace device/runtime compatibility checks.
+These are the board-validated INT8 deployment artifacts for the listed benchmark paths—not the original `.pt` checkpoints or ONNX intermediates. The v5/v5u and YOLO26 files now match the November 9 optimized full-profile run; the v8/v11 binaries remain the previously published board-profile artifacts. Checksum verification establishes file identity; it does not replace device/runtime compatibility checks.
 
 The binaries are derivatives of upstream YOLO model weights. Their distribution is separate from this repository's Apache-2.0 source-code license. They are included only under the project's confirmed authorization to redistribute these artifacts. Respect the applicable upstream/model licenses and RKNN tool/runtime terms.

@@ -40,8 +40,15 @@ def run(args: argparse.Namespace) -> None:
         raise FileNotFoundError(calibration)
 
     images = [Path(line.strip()) for line in calibration.read_text().splitlines() if line.strip()]
-    if len(images) != 500 or len({str(p) for p in images}) != 500:
-        raise ValueError("calibration manifest must contain exactly 500 unique images")
+    if len(images) != len(set(map(str, images))):
+        raise ValueError("calibration manifest contains duplicate image paths")
+    if len(images) != 500 and not args.allow_nonstandard_calibration:
+        raise ValueError(
+            "calibration manifest must contain exactly 500 images; pass "
+            "--allow-nonstandard-calibration to run a clearly marked experiment"
+        )
+    if not images:
+        raise ValueError("calibration manifest is empty")
     missing = [str(p) for p in images if not p.is_file()]
     if missing:
         raise FileNotFoundError(f"missing calibration images (first): {missing[0]}")
@@ -58,6 +65,7 @@ def run(args: argparse.Namespace) -> None:
     export_code = (
         "from ultralytics import YOLO; "
         f"model=YOLO({str(copied_weight)!r}); "
+        f"model.model.model[-1]._rknn_postprocess_gate={args.gate!r}; "
         "model.export(format='rknn', imgsz=640, batch=1, dynamic=False, opset=14)"
     )
     subprocess.run([args.python, "-c", export_code], cwd=output, env=env, check=True)
@@ -119,10 +127,12 @@ def run(args: argparse.Namespace) -> None:
         "target": "rk3588",
         "input": {"width": 640, "height": 640, "batch": 1, "format": "RGB", "layout": "NHWC"},
         "quantization": "INT8 asymmetric",
+        "calibration_standard_size": 500,
+        "calibration_is_standard_size": len(images) == 500,
         "export_path": "RKOptimized raw-head one-to-many",
         "output_semantics": "raw_head_one_to_many",
         "nms_free": False,
-        "postprocess": "score-sum confidence filter + raw-head decode + class-wise NMS",
+        "postprocess": f"{args.gate} confidence filter + raw-head decode + class-wise NMS",
         "outputs": schema["outputs"],
         "files": {
             "weights": {"path": copied_weight.name, "sha256": sha256(copied_weight)},
@@ -150,6 +160,10 @@ def main() -> None:
     parser.add_argument("--calibration", type=Path, required=True,
                         help="500-image COCO train calibration list; paths must exist")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--gate", choices=("score_sum", "score_max"), default="score_sum",
+                        help="Raw-head lossless CPU prefilter: sum bound or max-score bound")
+    parser.add_argument("--allow-nonstandard-calibration", action="store_true",
+                        help="Permit an explicitly experimental calibration manifest not containing 500 images")
     parser.add_argument("--python", default=sys.executable,
                         help="Python with Ultralytics, ONNX, and RKNN Toolkit 2 installed")
     run(parser.parse_args())
