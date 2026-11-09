@@ -108,7 +108,7 @@ cmake --build build-rkvs-minimal --target rk3588_yolo_benchmark rk3588_yolo_qual
 
 ## 模型文件
 
-已提供 10 个板端部署用 INT8 RKNN 文件（v5/v5u/v8/v11/v26 各 n/s），总计约 70.6 MiB，统一收录于 [`models/rk3588-int8/`](models/rk3588-int8/README.md)。该目录含文件 SHA-256 清单和模型语义说明，可用 `sha256sum -c models/rk3588-int8/SHA256SUMS` 校验。只发布有公开再分发授权的、通过对应输出协议和板端验证的 RKNN；原始 `.pt`、ONNX 中间文件、校准图片和无效 YOLO26 one-to-one 实验二进制不在本仓库。
+已提供十个模型的 PT 权重、桌面导出的 ONNX、RKNN 转换输入 ONNX，以及十个板端部署用 INT8 RKNN。PT 和 ONNX 文件按用途区分并带 SHA-256 清单，详见 [`models/README.md`](models/README.md)；RKNN 文件说明见 [`models/rk3588-int8/`](models/rk3588-int8/README.md)。TensorRT `.engine` 不上传，按报告中的环境和脚本在目标 GPU 上重新构建。COCO 原图不随仓库分发；固定测试/校准清单、哈希与数据获取说明用于定位同一数据子集。无效 YOLO26 one-to-one RKNN 实验文件不发布。
 
 ## 仓库结构
 
